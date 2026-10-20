@@ -25,7 +25,10 @@ function buildApp(id, flags = []) {
       publish: [],
       directories: { output: path.join('dist', id) },
       files: ['src/**/*', 'package.json'],
-      extraResources: [{ from: configPath, to: 'app-config.json' }],
+      extraResources: [
+        { from: configPath, to: 'app-config.json' },
+        ...(fs.existsSync(path.join(dir, 'icon.png')) ? [{ from: path.join(dir, 'icon.png'), to: 'icon.png' }] : []),
+      ],
       extraMetadata: { name: id, productName: config.name, homepage: config.url, desktopName: `${id}.desktop` },
       ...(icon && { icon }),
       mac: { target: ['dmg', 'zip'], category: 'public.app-category.productivity' },

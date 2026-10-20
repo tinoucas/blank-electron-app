@@ -5,6 +5,8 @@ const path = require('path');
 // In dev the config path comes from scripts/run.js; packaged apps ship it as a resource.
 const configPath = process.env.WEBAPP_CONFIG || path.join(process.resourcesPath, 'app-config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+// The icon sits next to the config, both in apps/<id>/ and in the packaged resources.
+const iconPath = path.join(path.dirname(configPath), 'icon.png');
 
 // Give every wrapped site its own profile (cookies, storage) even in dev.
 app.setName(config.name);
@@ -45,6 +47,8 @@ function createWindow() {
   win = new BrowserWindow({
     ...state,
     title: config.name,
+    // Window icon for Linux/Windows; Wayland compositors read it via xdg-toplevel-icon.
+    ...(fs.existsSync(iconPath) && { icon: iconPath }),
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
