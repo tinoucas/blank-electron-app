@@ -48,7 +48,8 @@ function validateName(name) {
   if (!n) throw new Error('The name is empty');
   if (n.length > 64) throw new Error('The name is too long (64 characters max)');
   if (/[<>:"/\\|?*\x00-\x1f]/.test(n)) throw new Error(`The name can't contain any of < > : " / \\ | ? * (got "${n}")`);
-  if (/^\.+$/.test(n)) throw new Error(`Not a usable name: "${n}"`);
+  // Windows can't have a folder named like a device, or ending with a dot.
+  if (/^\.+$/.test(n) || /\.$/.test(n) || /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(n)) throw new Error(`Not a usable name: "${n}"`);
   return n;
 }
 

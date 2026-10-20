@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawn } = require('child_process');
+const { execSync, spawn, spawnSync } = require('child_process');
 const { parseUrl, resolveUrl } = require('./url');
 const { validateName, validateId } = require('./common');
 
@@ -17,7 +17,7 @@ Arguments:
                      The page must load, otherwise nothing is created.
 
 Options:
-  --name <name>      App name shown in the window title, app menu or Applications folder.
+  --name <name>      App name shown in the window title and where the app is installed.
                      Default: taken from the domain (app.example.com -> "App").
   --id <id>          Internal id (lowercase letters, digits, dashes) used for file names.
                      Default: derived from the name. Rarely needed.
@@ -25,11 +25,11 @@ Options:
                      512x512 or larger looks best). Default: the site's own icon.
   --skip-check       Don't check that the URL loads (e.g. the server is offline right
                      now, or uses a certificate only your system trusts).
-  --uninstall        Remove the installed app (Linux app menu, macOS Applications folder).
+  --uninstall        Remove the installed app.
   -h, --help         Show this help.
 
-Linux and macOS: once built, the app is launched so you can check it, and you are asked
-whether to install it (Linux: app menu, macOS: ~/Applications).
+Once built, the app is launched so you can check it, and you are asked whether to
+install it (Linux: app menu, macOS: ~/Applications, Windows: Start menu).
 
 Examples:
   ${self} music.example.com
@@ -85,20 +85,26 @@ const { appsDir, distDir, resolveApp, findAppByUrl, createApp, renameApp, change
 const { ensureIcon, loadIcon } = require('./icon');
 const { buildApp } = require('./build');
 // Where and how the built app gets installed on this OS; null where we only build.
-const platform = { linux: './linux', darwin: './macos' }[process.platform];
+const platform = { linux: './linux', darwin: './macos', win32: './windows' }[process.platform];
 const installer = platform && require(platform);
+
+// Closes the test launch, including Electron's helper processes.
+function stop(child) {
+  try {
+    if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    else process.kill(-child.pid);
+  } catch {}
+}
 
 async function tryAndInstall(id, builtApp) {
   console.log(`\nLaunching ${path.basename(builtApp)} so you can check it...`);
-  const child = spawn(installer.executable(builtApp), [], { stdio: 'ignore', detached: true });
+  const child = spawn(installer.executable(builtApp), [], { stdio: 'ignore', detached: true, windowsHide: false });
   child.on('error', (err) => console.error(`Could not launch it: ${err.message}`));
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const answer = await rl.question(`Does everything look right? Install it in ${installer.place}? [y/N] `);
   rl.close();
-  try {
-    process.kill(-child.pid);
-  } catch {}
+  stop(child);
 
   if (!/^y(es)?$/i.test(answer.trim())) {
     console.log('Not installed. Run the same command again when you want to.');

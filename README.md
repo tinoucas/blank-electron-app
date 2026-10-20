@@ -20,7 +20,8 @@ installed is [Node.js](https://nodejs.org) 20 or newer.
    - **Linux:** it's added to your app menu, with its icon in the title bar as well.
    - **macOS:** it's copied to `~/Applications`, so it shows up in Launchpad and
      Spotlight and can be kept in the Dock.
-   - **Windows:** for now, the installer is in `dist/<id>/`.
+   - **Windows:** it's copied to `%LOCALAPPDATA%\Programs` and added to the Start menu,
+     from where you can pin it to the taskbar.
 
 Running the same command again updates the app. For example, add `--icon` or `--name`
 to change the icon or the name; you stay logged in.
@@ -49,7 +50,10 @@ to change the icon or the name; you stay logged in.
 - Each app has its own cookies and logins, separate from your browser and from other apps.
 - Without `http://` or `https://`, https is tried first, then http.
 - Each app's settings are kept in `apps/<id>/`.
-- **macOS:** no Apple Developer account is needed. Apps you build on your Mac open normally.
-  If you send a built app to someone else, their Mac flags it as downloaded and blocks it
-  ("unidentified developer" or "damaged"). They can unblock it with
-  `xattr -dr com.apple.quarantine "/path/to/App.app"`.
+- **Code signing:** none is needed on any OS for apps you build on your own computer.
+  Signing only matters if you send a built app to someone else:
+  - **macOS:** their Mac blocks it ("unidentified developer" or "damaged"). They can
+    unblock it with `xattr -dr com.apple.quarantine "/path/to/App.app"`.
+  - **Windows:** SmartScreen warns about it. They click *More info* → *Run anyway*.
+- **Windows:** run `create-app.cmd` from Command Prompt or PowerShell. In Git Bash, the
+  "install it?" question isn't shown.

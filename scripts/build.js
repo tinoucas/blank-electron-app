@@ -24,37 +24,40 @@ async function buildApp(id) {
 function runBuilder(id) {
   // Start from an empty folder so builds left over from an older name can't be picked up.
   fs.rmSync(path.join(distDir, id), { recursive: true, force: true });
+  return builder.build({ publish: 'never', config: builderConfig(id) });
+}
+
+// electron-builder configuration for an app; each OS uses its own section.
+function builderConfig(id) {
   const { dir, configPath, config } = resolveApp(id);
 
   const icon = ['icon.png', 'icon.icns', 'icon.ico']
     .map((f) => path.join(dir, f))
     .find((f) => fs.existsSync(f));
 
-  return builder.build({
-    publish: 'never',
-    config: {
-      appId: config.appId || `com.webapp.${id}`,
-      productName: config.name,
-      publish: [],
-      directories: { output: path.join(distDir, id) },
-      files: ['src/**/*', 'package.json'],
-      extraResources: [
-        { from: configPath, to: 'app-config.json' },
-        ...(fs.existsSync(path.join(dir, 'icon.png')) ? [{ from: path.join(dir, 'icon.png'), to: 'icon.png' }] : []),
-      ],
-      extraMetadata: { name: id, productName: config.name, homepage: config.url, desktopName: `${id}.desktop` },
-      ...(icon && { icon }),
-      // A plain .app for this Mac's chip, ad-hoc signed: enough to run on the Mac that built it.
-      mac: {
-        target: [{ target: 'dir', arch: [process.arch] }],
-        identity: '-',
-        hardenedRuntime: false,
-        category: 'public.app-category.productivity',
-      },
-      win: { target: ['nsis', 'portable'] },
-      linux: { target: ['AppImage'], category: 'Network', syncDesktopName: true },
+  return {
+    appId: config.appId || `com.webapp.${id}`,
+    productName: config.name,
+    publish: [],
+    directories: { output: path.join(distDir, id) },
+    files: ['src/**/*', 'package.json'],
+    extraResources: [
+      { from: configPath, to: 'app-config.json' },
+      ...(fs.existsSync(path.join(dir, 'icon.png')) ? [{ from: path.join(dir, 'icon.png'), to: 'icon.png' }] : []),
+    ],
+    extraMetadata: { name: id, productName: config.name, homepage: config.url, desktopName: `${id}.desktop` },
+    ...(icon && { icon }),
+    // A plain .app for this Mac's chip, ad-hoc signed: enough to run on the Mac that built it.
+    mac: {
+      target: [{ target: 'dir', arch: [process.arch] }],
+      identity: '-',
+      hardenedRuntime: false,
+      category: 'public.app-category.productivity',
     },
-  });
+    // A plain app folder for this PC's architecture; create-app installs it and adds the shortcut.
+    win: { target: [{ target: 'dir', arch: [process.arch] }] },
+    linux: { target: ['AppImage'], category: 'Network', syncDesktopName: true },
+  };
 }
 
-module.exports = { buildApp };
+module.exports = { buildApp, builderConfig };

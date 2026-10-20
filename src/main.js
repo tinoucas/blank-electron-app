@@ -10,6 +10,8 @@ const iconPath = path.join(path.dirname(configPath), 'icon.png');
 
 // Give every wrapped site its own profile (cookies, storage) even in dev.
 app.setName(config.name);
+// Must match the Start menu shortcut's id so Windows groups the window with it (taskbar icon, pinning).
+if (process.platform === 'win32') app.setAppUserModelId(config.appId);
 // "profile" keeps the original folder (and logins) when an app is renamed.
 app.setPath('userData', path.join(app.getPath('appData'), config.profile || config.name));
 
