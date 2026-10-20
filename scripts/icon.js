@@ -84,6 +84,16 @@ async function decode(buf) {
   return { img, size: Math.min(meta.width, meta.height), vector };
 }
 
+function writeIcon(img, dest) {
+  return img
+    .resize(ICON_SIZE, ICON_SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toFile(dest);
+}
+
+const sizeNote = (decoded) =>
+  !decoded.vector && decoded.size < ICON_SIZE ? ` (upscaled from ${decoded.size}px, use a larger image for a sharper icon)` : '';
+
 // Downloads the best icon for pageUrl and writes it as a square ICON_SIZE PNG to dest.
 async function fetchIcon(pageUrl, dest) {
   const candidates = await findCandidates(pageUrl);
@@ -98,32 +108,62 @@ async function fetchIcon(pageUrl, dest) {
     } catch {}
   }
   if (!best) throw new Error('no usable icon found');
-
-  await best.img
-    .resize(ICON_SIZE, ICON_SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toFile(dest);
-  return { source: best.url, size: best.vector ? 'vector' : best.size };
+  await writeIcon(best.img, dest);
+  return { source: best.url, note: sizeNote(best) };
 }
 
-// Fetches the icon for an app folder, never failing the caller: a missing icon just means Electron's default.
+// Fetches the site's icon for an app folder, never failing the caller: a missing icon just means Electron's default.
 async function ensureIcon(dir, url, { force = false } = {}) {
   const existing = ['icon.png', 'icon.icns', 'icon.ico'].find((f) => fs.existsSync(path.join(dir, f)));
   if (existing && !force) return;
   try {
-    const { source, size } = await fetchIcon(url, path.join(dir, 'icon.png'));
-    const note = size !== 'vector' && size < ICON_SIZE ? ` (upscaled from ${size}px, replace it for a sharper icon)` : '';
+    const { source, note } = await fetchIcon(url, path.join(dir, 'icon.png'));
     console.log(`Icon: ${source}${note}`);
   } catch (err) {
     console.warn(`Could not fetch an icon (${err.message}); the default Electron icon will be used.`);
   }
 }
 
-if (require.main === module) {
-  // Usage: npm run icon -- <app-id>   (re-downloads, replacing the current icon.png)
-  const { resolveApp } = require('./common');
-  const { dir, config } = resolveApp(process.argv[2]);
-  ensureIcon(dir, config.url, { force: true });
+// Loads a user-chosen icon (local file or http(s) URL) and returns a function that installs
+// it in an app folder, replacing the current icon. Loading first lets callers fail before
+// creating anything. Throws with a readable reason, since the user explicitly asked for it.
+async function loadIcon(source) {
+  let buf;
+  if (/^https?:\/\//i.test(source)) {
+    try {
+      buf = Buffer.from(await (await get(source)).arrayBuffer());
+    } catch (err) {
+      throw new Error(`Could not download icon ${source}: ${err.cause?.message || err.message}`);
+    }
+  } else {
+    const file = path.resolve(source);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error(`Icon file not found: ${file}`);
+    buf = fs.readFileSync(file);
+  }
+  let decoded;
+  try {
+    decoded = await decode(buf);
+  } catch {
+    throw new Error(`${source} is not a supported image (use PNG, JPEG, WebP, GIF, SVG or ICO)`);
+  }
+  return async (dir) => {
+    // Drop other icon formats so the build can't pick a stale one.
+    for (const f of ['icon.icns', 'icon.ico']) fs.rmSync(path.join(dir, f), { force: true });
+    await writeIcon(decoded.img, path.join(dir, 'icon.png'));
+    console.log(`Icon: ${source}${sizeNote(decoded)}`);
+  };
 }
 
-module.exports = { fetchIcon, ensureIcon };
+if (require.main === module) {
+  // Usage: npm run icon -- <app-id> [file|url]
+  // With an image, uses it as the icon; without, re-downloads the site's icon. Replaces the current icon.png.
+  const { resolveApp } = require('./common');
+  const [id, source] = process.argv.slice(2);
+  const { dir, config } = resolveApp(id);
+  (source ? loadIcon(source).then((apply) => apply(dir)) : ensureIcon(dir, config.url, { force: true })).catch((err) => {
+    console.error(err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { fetchIcon, ensureIcon, loadIcon };

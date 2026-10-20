@@ -42,7 +42,7 @@ function findAppByUrl(url) {
   });
 }
 
-function createApp(url, { id = idFromUrl(url), name } = {}) {
+function createApp(url, { id = idFromUrl(url), name, extraHosts = [] } = {}) {
   const dir = path.join(appsDir, id);
   if (fs.existsSync(dir)) throw new Error(`apps/${id} already exists; pick another id`);
   fs.mkdirSync(dir, { recursive: true });
@@ -52,11 +52,18 @@ function createApp(url, { id = idFromUrl(url), name } = {}) {
     appId: `com.webapp.${id}`,
     width: 1280,
     height: 800,
-    allowedHosts: [baseHost(url)],
+    allowedHosts: [...new Set([baseHost(url), ...extraHosts])],
     userAgent: null,
   };
   fs.writeFileSync(path.join(dir, 'app.json'), JSON.stringify(config, null, 2) + '\n');
   return id;
 }
 
-module.exports = { appsDir, listApps, resolveApp, normalizeUrl, idFromUrl, findAppByUrl, createApp };
+// Extra hosts to allow when the start URL redirects to a domain the app wouldn't otherwise keep in-app.
+function redirectHosts(url, finalUrl) {
+  const start = baseHost(url);
+  const final = baseHost(finalUrl);
+  return final === start || final.endsWith('.' + start) ? [] : [final];
+}
+
+module.exports = { appsDir, listApps, resolveApp, normalizeUrl, idFromUrl, findAppByUrl, createApp, redirectHosts };

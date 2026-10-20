@@ -12,16 +12,39 @@ npm install
 ## Quick bundle (just a URL)
 
 ```sh
-./bundle.sh https://app.example.com     # macOS / Linux
-bundle.cmd https://app.example.com      # Windows
+./bundle.sh https://app.example.com                      # macOS / Linux
+bundle.cmd https://app.example.com                       # Windows
+./bundle.sh 192.168.1.10:8095 --icon ~/Pictures/app.png  # custom icon (file or URL)
+./bundle.sh --help
 ```
 
-Given only a URL, this installs dependencies if they're missing. It then reuses the app
-already configured for that URL, or creates `apps/<id>/app.json` if there isn't one. If the
-app has no icon, it fetches the site's icon. Finally it packages the app for the current OS
-into `dist/<id>/`. The id and name come from the
-domain, for example `app.example.com` gives id `app` and name `App`. To change the name or
-add an icon, edit the app folder and run the script again.
+The steps it runs:
+
+1. Checks the URL (see below).
+2. Installs dependencies if they're missing.
+3. Reuses the app already configured for that URL, or creates `apps/<id>/app.json`.
+4. Sets the icon: your `--icon` if given, otherwise the site's own icon if the app has none yet.
+5. Packages the app for the current OS into `dist/<id>/`.
+
+The id and name come from the domain: `app.example.com` gives id `app` and name `App`.
+To change the name, edit `app.json` and run the script again.
+
+### URL checks
+
+Nothing is created unless the URL is usable:
+
+- Only `http://` and `https://` are accepted. A missing scheme means https, with a
+  fallback to http for self-hosted servers that have no TLS.
+- The URL can't contain a username or password, since it would end up inside the app.
+- Host names and IP addresses must be well formed.
+- The page must load. A DNS failure, refused connection, timeout, certificate error,
+  404/410 or 5xx stops the build and explains why.
+- Some problems only print a warning: 401/403 (often just a login page), a URL that
+  isn't an HTML page, and plain http to a public host.
+- If the URL redirects to another domain, that domain is added to `allowedHosts`.
+
+`--skip-check` skips the load test, for example when the server is offline at build time
+or uses a certificate that only your system trusts. The format checks always run.
 
 ### Linux: try it, then install it
 
@@ -60,8 +83,10 @@ and `/apple-touch-icon.png`, and keep the largest one. SVG icons are preferred b
 they scale without blurring. If the best icon available is small, it is upscaled and a
 note is printed, since it may look soft.
 
-To use your own icon, replace `icon.png` (or add `icon.icns`/`icon.ico`). An existing
-icon is never overwritten, except by `npm run icon -- <id>`, which downloads it again.
+To use your own icon, pass `--icon <file|url>` to `bundle`/`new`, or set it on an existing
+app with `npm run icon -- <id> <file|url>`. PNG, JPEG, WebP, GIF, SVG and ICO all work; the
+image is converted to `icon.png`. Without an image, `npm run icon -- <id>` downloads the
+site's icon again. Apart from that, an existing icon is never replaced.
 
 ## Run / package
 
