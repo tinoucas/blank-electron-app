@@ -9,6 +9,19 @@ used by every app, and each app is defined by a config file in `apps/<id>/app.js
 npm install
 ```
 
+## Quick bundle (just a URL)
+
+```sh
+./bundle.sh https://app.example.com     # macOS / Linux
+bundle.cmd https://app.example.com      # Windows
+```
+
+Given only a URL, this installs dependencies if they're missing. It then reuses the app
+already configured for that URL, or creates `apps/<id>/app.json` if there isn't one, and
+packages the app for the current OS into `dist/<id>/`. The id and name come from the
+domain, for example `app.example.com` gives id `app` and name `App`. To change the name or
+add an icon, edit the app folder and run the script again.
+
 ## Create an app (or clone one for another URL)
 
 ```sh

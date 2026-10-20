@@ -8,7 +8,8 @@
   "scripts": {
     "new": "node scripts/new-app.js",
     "start": "node scripts/run.js",
-    "build": "node scripts/build.js"
+    "build": "node scripts/build.js",
+    "bundle": "node scripts/bundle.js"
   },
   "devDependencies": {
     "electron": "^38.0.0",
