@@ -17,8 +17,9 @@ bundle.cmd https://app.example.com      # Windows
 ```
 
 Given only a URL, this installs dependencies if they're missing. It then reuses the app
-already configured for that URL, or creates `apps/<id>/app.json` if there isn't one, and
-packages the app for the current OS into `dist/<id>/`. The id and name come from the
+already configured for that URL, or creates `apps/<id>/app.json` if there isn't one. If the
+app has no icon, it fetches the site's icon. Finally it packages the app for the current OS
+into `dist/<id>/`. The id and name come from the
 domain, for example `app.example.com` gives id `app` and name `App`. To change the name or
 add an icon, edit the app folder and run the script again.
 
@@ -29,8 +30,17 @@ npm run new -- https://app.example.com --name "My App"      # creates apps/app/a
 npm run new -- https://other.site --name "Other" --id other  # pick the id yourself
 ```
 
-Add an optional `icon.png` (at least 512×512) to the app folder. You can also use
-`icon.icns` (macOS) or `icon.ico` (Windows).
+## Icons
+
+`bundle` and `new` download the site's icon automatically and save it as
+`apps/<id>/icon.png` (512×512). They check every icon the page declares
+(`<link rel="icon">`, `apple-touch-icon`, the web app manifest), plus `/favicon.ico`
+and `/apple-touch-icon.png`, and keep the largest one. SVG icons are preferred because
+they scale without blurring. If the best icon available is small, it is upscaled and a
+note is printed, since it may look soft.
+
+To use your own icon, replace `icon.png` (or add `icon.icns`/`icon.ico`). An existing
+icon is never overwritten, except by `npm run icon -- <id>`, which downloads it again.
 
 ## Run / package
 

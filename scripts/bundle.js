@@ -1,8 +1,11 @@
-const { normalizeUrl, findAppByUrl, createApp } = require('./common');
+const path = require('path');
+const { appsDir, normalizeUrl, findAppByUrl, createApp } = require('./common');
+const { ensureIcon } = require('./icon');
 const { buildApp, report } = require('./build');
 
 // Usage: node scripts/bundle.js <url>
-// Reuses the app already configured for this URL, otherwise creates one, then packages it.
+// Reuses the app already configured for this URL, otherwise creates one, fetches the
+// site's icon if the app has none, then packages it.
 const args = process.argv.slice(2);
 if (args.length !== 1) {
   console.error('Usage: bundle <url>');
@@ -30,4 +33,4 @@ if (id) {
   console.log(`Created apps/${id}/app.json`);
 }
 
-report(buildApp(id));
+report(ensureIcon(path.join(appsDir, id), url).then(() => buildApp(id)));

@@ -9,10 +9,13 @@
     "new": "node scripts/new-app.js",
     "start": "node scripts/run.js",
     "build": "node scripts/build.js",
-    "bundle": "node scripts/bundle.js"
+    "bundle": "node scripts/bundle.js",
+    "icon": "node scripts/icon.js"
   },
   "devDependencies": {
+    "decode-ico": "^0.4.1",
     "electron": "^38.0.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "sharp": "^0.35.5"
   }
 }

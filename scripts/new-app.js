@@ -1,4 +1,6 @@
-const { normalizeUrl, createApp } = require('./common');
+const path = require('path');
+const { appsDir, normalizeUrl, createApp } = require('./common');
+const { ensureIcon } = require('./icon');
 
 // Usage: npm run new -- <url> [--name "Display Name"] [--id app-id]
 const args = process.argv.slice(2);
@@ -14,13 +16,14 @@ if (!args[0]) {
   process.exit(1);
 }
 
+let created;
 try {
-  const created = createApp(normalizeUrl(args[0]), { id, name });
-  console.log(`Created apps/${created}/app.json
-Optional: add apps/${created}/icon.png (512x512 or larger)
-Try it:   npm start -- ${created}
-Package:  npm run build -- ${created}`);
+  created = createApp(normalizeUrl(args[0]), { id, name });
 } catch (err) {
   console.error(err.message);
   process.exit(1);
 }
+console.log(`Created apps/${created}/app.json`);
+ensureIcon(path.join(appsDir, created), normalizeUrl(args[0])).then(() =>
+  console.log(`Try it:   npm start -- ${created}
+Package:  npm run build -- ${created}`));
