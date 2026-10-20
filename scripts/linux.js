@@ -42,7 +42,7 @@ function refreshMenus() {
 }
 
 // Removes the menu entry and the files it points to (only those this tool put there).
-function uninstallDesktop(id) {
+function uninstall(id) {
   const entry = readEntry(id);
   if (!entry) return [];
   const removed = [entry.file];
@@ -53,10 +53,10 @@ function uninstallDesktop(id) {
   return removed;
 }
 
-function installDesktop(id, appImageSource) {
+function install(id, appImageSource) {
   const { dir, config } = resolveApp(id);
   // Clears the previous install, including an AppImage copy named after an older name.
-  uninstallDesktop(id);
+  uninstall(id);
 
   const appImage = path.join(appImagesDir, `${config.name.replace(/[^\w.-]+/g, '-')}.AppImage`);
   fs.mkdirSync(appImagesDir, { recursive: true });
@@ -93,4 +93,10 @@ function installDesktop(id, appImageSource) {
   return [appImage, ...(hasIcon ? [icon] : []), file];
 }
 
-module.exports = { installDesktop, uninstallDesktop, isInstalled: (id) => !!readEntry(id) };
+module.exports = {
+  place: 'your app menu',
+  findBuilt: (built) => built.find((f) => f.endsWith('.AppImage')),
+  executable: (appImage) => appImage,
+  install,
+  uninstall,
+};

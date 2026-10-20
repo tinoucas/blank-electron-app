@@ -16,9 +16,11 @@ installed is [Node.js](https://nodejs.org) 20 or newer.
 1. Checks that the address is valid and that the page loads. If not, it stops and says why.
 2. Finds the site's icon.
 3. Builds the app. This takes about a minute, plus a one-time setup on the first run.
-4. **Linux:** opens the app so you can check it, then asks whether to add it to your app
-   menu. Answer `y` and it shows up there with its icon, in the title bar as well.
-   **macOS / Windows:** the app or installer is in `dist/<id>/`.
+4. Opens the app so you can check it, then asks whether to install it. Answer `y`:
+   - **Linux:** it's added to your app menu, with its icon in the title bar as well.
+   - **macOS:** it's copied to `~/Applications`, so it shows up in Launchpad and
+     Spotlight and can be kept in the Dock.
+   - **Windows:** for now, the installer is in `dist/<id>/`.
 
 Running the same command again updates the app. For example, add `--icon` or `--name`
 to change the icon or the name; you stay logged in.
@@ -31,7 +33,7 @@ to change the icon or the name; you stay logged in.
 | `--icon <file or URL>` | Your own icon (PNG, JPEG, WebP, GIF, SVG or ICO). Default: the site's icon |
 | `--id my-app` | Internal name used for files. Default: from `--name`. Rarely needed |
 | `--skip-check` | Build even if the page can't be loaded right now |
-| `--uninstall` | Remove the app from the app menu |
+| `--uninstall` | Remove the installed app |
 | `--help` | Show all of this |
 
 ```sh
@@ -47,3 +49,7 @@ to change the icon or the name; you stay logged in.
 - Each app has its own cookies and logins, separate from your browser and from other apps.
 - Without `http://` or `https://`, https is tried first, then http.
 - Each app's settings are kept in `apps/<id>/`.
+- **macOS:** no Apple Developer account is needed. Apps you build on your Mac open normally.
+  If you send a built app to someone else, their Mac flags it as downloaded and blocks it
+  ("unidentified developer" or "damaged"). They can unblock it with
+  `xattr -dr com.apple.quarantine "/path/to/App.app"`.

@@ -17,7 +17,7 @@ Arguments:
                      The page must load, otherwise nothing is created.
 
 Options:
-  --name <name>      App name shown in the window title and the app menu.
+  --name <name>      App name shown in the window title, app menu or Applications folder.
                      Default: taken from the domain (app.example.com -> "App").
   --id <id>          Internal id (lowercase letters, digits, dashes) used for file names.
                      Default: derived from the name. Rarely needed.
@@ -25,11 +25,11 @@ Options:
                      512x512 or larger looks best). Default: the site's own icon.
   --skip-check       Don't check that the URL loads (e.g. the server is offline right
                      now, or uses a certificate only your system trusts).
-  --uninstall        Remove the app from the app menu (Linux).
+  --uninstall        Remove the installed app (Linux app menu, macOS Applications folder).
   -h, --help         Show this help.
 
-Linux: once built, the app is launched so you can check it, and you are asked whether
-to add it to your app menu.
+Linux and macOS: once built, the app is launched so you can check it, and you are asked
+whether to install it (Linux: app menu, macOS: ~/Applications).
 
 Examples:
   ${self} music.example.com
@@ -84,26 +84,29 @@ const readline = require('readline/promises');
 const { appsDir, distDir, resolveApp, findAppByUrl, createApp, renameApp, changeId, redirectHosts } = require('./common');
 const { ensureIcon, loadIcon } = require('./icon');
 const { buildApp } = require('./build');
-const { installDesktop, uninstallDesktop } = require('./desktop');
+// Where and how the built app gets installed on this OS; null where we only build.
+const platform = { linux: './linux', darwin: './macos' }[process.platform];
+const installer = platform && require(platform);
 
-async function tryAndInstall(id, appImage) {
-  console.log(`\nLaunching ${path.basename(appImage)} so you can check it...`);
-  const child = spawn(appImage, [], { stdio: 'ignore', detached: true });
+async function tryAndInstall(id, builtApp) {
+  console.log(`\nLaunching ${path.basename(builtApp)} so you can check it...`);
+  const child = spawn(installer.executable(builtApp), [], { stdio: 'ignore', detached: true });
   child.on('error', (err) => console.error(`Could not launch it: ${err.message}`));
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await rl.question('Does everything look right? Add it to your app menu? [y/N] ');
+  const answer = await rl.question(`Does everything look right? Install it in ${installer.place}? [y/N] `);
   rl.close();
   try {
     process.kill(-child.pid);
   } catch {}
 
   if (!/^y(es)?$/i.test(answer.trim())) {
-    console.log('Not added to the menu. Run the same command again when you want to.');
+    console.log('Not installed. Run the same command again when you want to.');
     return;
   }
-  installDesktop(id, appImage);
-  console.log(`Added "${resolveApp(id).config.name}" to your app menu.\nTo remove it: ${self} ${resolveApp(id).config.url} --uninstall`);
+  const { config } = resolveApp(id);
+  const [where] = installer.install(id, builtApp);
+  console.log(`Installed "${config.name}" in ${installer.place} (${where}).\nTo remove it: ${self} ${config.url} --uninstall`);
 }
 
 // Finds the app for --uninstall without loading the page: the server may be gone for good.
@@ -118,13 +121,24 @@ function findForUninstall() {
   throw new Error(`No app was created for ${opts.url}`);
 }
 
+// Where Electron keeps the app's cookies and logins (see app.getPath('appData') in src/main.js).
+function profileDir(config) {
+  const home = require('os').homedir();
+  const appData = {
+    darwin: path.join(home, 'Library', 'Application Support'),
+    win32: process.env.APPDATA || path.join(home, 'AppData', 'Roaming'),
+  }[process.platform] || process.env.XDG_CONFIG_HOME || path.join(home, '.config');
+  return path.join(appData, config.profile || config.name);
+}
+
 function uninstall() {
   const id = findForUninstall();
   const { config } = resolveApp(id);
-  const removed = uninstallDesktop(id);
+  const removed = installer ? installer.uninstall(id) : [];
   fs.rmSync(path.join(distDir, id), { recursive: true, force: true });
-  console.log(removed.length ? `Removed "${config.name}" from your app menu.` : `"${config.name}" was not in your app menu.`);
-  console.log(`Kept its settings and icon in apps/${id}/ and its login data in your user config folder ("${config.profile || config.name}"), in case you create it again.`);
+  if (!installer) console.log(`Remove "${config.name}" like any other app on this system.`);
+  else console.log(removed.length ? `Removed "${config.name}" from ${installer.place}.` : `"${config.name}" was not installed.`);
+  console.log(`Kept its settings and icon in apps/${id}/ and its login data in ${profileDir(config)}, in case you create it again.`);
 }
 
 async function create() {
@@ -137,9 +151,9 @@ async function create() {
   if (id) {
     console.log(`Updating "${resolveApp(id).config.name}" (apps/${id})`);
     if (opts.id && opts.id !== id) {
+      // The installed copy is tied to the old id; the new one is offered at the end.
+      if (installer?.uninstall(id).length) console.log(`Removed the installed copy for the old id "${id}"`);
       changeId(id, opts.id);
-      // The menu entry is named after the id; the new one is added at the end.
-      if (uninstallDesktop(id).length) console.log(`Removed the menu entry for the old id "${id}"`);
       console.log(`Id changed from "${id}" to "${opts.id}"`);
       id = opts.id;
     }
@@ -156,12 +170,13 @@ async function create() {
 
   console.log('Building (this takes a minute)...');
   const built = await buildApp(id);
-  console.log(`Built:\n  ${built.join('\n  ')}`);
+  const outputs = built.length ? built : [path.join(distDir, id)];
+  console.log(`Built:\n  ${outputs.join('\n  ')}`);
 
-  const appImage = built.find((f) => f.endsWith('.AppImage'));
-  if (process.platform !== 'linux' || !appImage) return;
-  if (process.stdin.isTTY) await tryAndInstall(id, appImage);
-  else console.log(`Run this from a terminal to be offered to add it to your app menu.`);
+  const builtApp = installer?.findBuilt(built, path.join(distDir, id));
+  if (!builtApp) return;
+  if (process.stdin.isTTY) await tryAndInstall(id, builtApp);
+  else console.log(`Run this from a terminal to be offered to install it in ${installer.place}.`);
 }
 
 (opts.uninstall ? Promise.resolve().then(uninstall) : create()).catch((err) => {

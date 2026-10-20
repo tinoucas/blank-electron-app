@@ -44,7 +44,13 @@ function runBuilder(id) {
       ],
       extraMetadata: { name: id, productName: config.name, homepage: config.url, desktopName: `${id}.desktop` },
       ...(icon && { icon }),
-      mac: { target: ['dmg', 'zip'], category: 'public.app-category.productivity' },
+      // A plain .app for this Mac's chip, ad-hoc signed: enough to run on the Mac that built it.
+      mac: {
+        target: [{ target: 'dir', arch: [process.arch] }],
+        identity: '-',
+        hardenedRuntime: false,
+        category: 'public.app-category.productivity',
+      },
       win: { target: ['nsis', 'portable'] },
       linux: { target: ['AppImage'], category: 'Network', syncDesktopName: true },
     },
