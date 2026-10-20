@@ -1,0 +1,9 @@
+{
+  "name": "Example",
+  "url": "https://example.com",
+  "appId": "com.example.webapp",
+  "width": 1280,
+  "height": 800,
+  "allowedHosts": ["example.com"],
+  "userAgent": null
+}
