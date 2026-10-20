@@ -48,6 +48,8 @@ to change the icon or the name; you stay logged in.
   browser. If the site signs you in through another domain (Google, Microsoft…), add that
   domain to `allowedHosts` in `apps/<id>/app.json` and run the command again.
 - Each app has its own cookies and logins, separate from your browser and from other apps.
+- Sites that talk to USB, HID or serial devices (WebUSB, WebHID, Web Serial) work: when the
+  site asks for a device, the app shows a list to choose from and remembers your choice.
 - Without `http://` or `https://`, https is tried first, then http.
 - Each app's settings are kept in `apps/<id>/`.
 - **Code signing:** none is needed on any OS for apps you build on your own computer.
