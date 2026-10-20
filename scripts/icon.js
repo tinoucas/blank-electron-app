@@ -154,16 +154,4 @@ async function loadIcon(source) {
   };
 }
 
-if (require.main === module) {
-  // Usage: npm run icon -- <app-id> [file|url]
-  // With an image, uses it as the icon; without, re-downloads the site's icon. Replaces the current icon.png.
-  const { resolveApp } = require('./common');
-  const [id, source] = process.argv.slice(2);
-  const { dir, config } = resolveApp(id);
-  (source ? loadIcon(source).then((apply) => apply(dir)) : ensureIcon(dir, config.url, { force: true })).catch((err) => {
-    console.error(err.message);
-    process.exit(1);
-  });
-}
-
-module.exports = { fetchIcon, ensureIcon, loadIcon };
+module.exports = { ensureIcon, loadIcon };

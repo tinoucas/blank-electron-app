@@ -10,21 +10,21 @@ const { resolveApp } = require('./common');
 
 const home = os.homedir();
 const dataHome = process.env.XDG_DATA_HOME || path.join(home, '.local', 'share');
+const appImagesDir = path.join(home, 'Applications');
+const iconsDir = path.join(dataHome, 'icons', 'hicolor', '512x512', 'apps');
 const MARKER = 'X-Webapp-Shell=true';
 
-function paths(id, name) {
-  return {
-    appImage: path.join(home, 'Applications', `${name.replace(/[^\w.-]+/g, '-')}.AppImage`),
-    icon: path.join(dataHome, 'icons', 'hicolor', '512x512', 'apps', `${id}.png`),
-    desktop: path.join(dataHome, 'applications', `${id}.desktop`),
-  };
-}
+const desktopFile = (id) => path.join(dataHome, 'applications', `${id}.desktop`);
 
-// Refuse to touch a .desktop file this tool did not write.
-function assertOwned(desktopPath) {
-  if (fs.existsSync(desktopPath) && !fs.readFileSync(desktopPath, 'utf8').includes(MARKER)) {
-    throw new Error(`${desktopPath} exists and was not created by this tool; not touching it`);
-  }
+// Reads an installed entry; null if there is none. Refuses entries this tool did not write.
+function readEntry(id) {
+  const file = desktopFile(id);
+  if (!fs.existsSync(file)) return null;
+  const text = fs.readFileSync(file, 'utf8');
+  if (!text.includes(MARKER)) throw new Error(`${file} exists and was not created by this tool; not touching it`);
+  const field = (key) => text.match(new RegExp(`^${key}=(.*)$`, 'm'))?.[1];
+  const exec = field('Exec')?.replace(/^"(.*)"$/, '$1').replace(/\\(["`$\\])/g, '$1');
+  return { file, appImage: exec, icon: field('Icon') };
 }
 
 const quoteExec = (p) => `"${p.replace(/(["`$\\])/g, '\\$1')}"`;
@@ -41,44 +41,47 @@ function refreshMenus() {
   }
 }
 
-// After a rename the AppImage gets a new file name; delete the copy the old .desktop pointed to.
-function removeStaleAppImage(p) {
-  if (!fs.existsSync(p.desktop)) return;
-  const exec = fs.readFileSync(p.desktop, 'utf8').match(/^Exec="(.*)"$/m);
-  if (!exec) return;
-  const old = exec[1].replace(/\\(["`$\\])/g, '$1');
-  if (old !== p.appImage && path.dirname(old) === path.dirname(p.appImage) && old.endsWith('.AppImage')) {
-    fs.rmSync(old, { force: true });
-  }
+// Removes the menu entry and the files it points to (only those this tool put there).
+function uninstallDesktop(id) {
+  const entry = readEntry(id);
+  if (!entry) return [];
+  const removed = [entry.file];
+  if (entry.appImage && path.dirname(entry.appImage) === appImagesDir && entry.appImage.endsWith('.AppImage')) removed.push(entry.appImage);
+  if (entry.icon && path.dirname(entry.icon) === iconsDir) removed.push(entry.icon);
+  removed.forEach((f) => fs.rmSync(f, { force: true }));
+  refreshMenus();
+  return removed;
 }
 
 function installDesktop(id, appImageSource) {
   const { dir, config } = resolveApp(id);
-  const p = paths(id, config.name);
-  assertOwned(p.desktop);
-  removeStaleAppImage(p);
+  // Clears the previous install, including an AppImage copy named after an older name.
+  uninstallDesktop(id);
 
-  fs.mkdirSync(path.dirname(p.appImage), { recursive: true });
-  fs.copyFileSync(appImageSource, p.appImage);
-  fs.chmodSync(p.appImage, 0o755);
+  const appImage = path.join(appImagesDir, `${config.name.replace(/[^\w.-]+/g, '-')}.AppImage`);
+  fs.mkdirSync(appImagesDir, { recursive: true });
+  fs.copyFileSync(appImageSource, appImage);
+  fs.chmodSync(appImage, 0o755);
 
   const iconSource = path.join(dir, 'icon.png');
+  const icon = path.join(iconsDir, `${id}.png`);
   const hasIcon = fs.existsSync(iconSource);
   if (hasIcon) {
-    fs.mkdirSync(path.dirname(p.icon), { recursive: true });
-    fs.copyFileSync(iconSource, p.icon);
+    fs.mkdirSync(iconsDir, { recursive: true });
+    fs.copyFileSync(iconSource, icon);
   }
 
-  fs.mkdirSync(path.dirname(p.desktop), { recursive: true });
+  const file = desktopFile(id);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
-    p.desktop,
+    file,
     [
       '[Desktop Entry]',
       'Type=Application',
       `Name=${config.name}`,
       `Comment=${config.url}`,
-      `Exec=${quoteExec(p.appImage)}`,
-      ...(hasIcon ? [`Icon=${p.icon}`] : []),
+      `Exec=${quoteExec(appImage)}`,
+      ...(hasIcon ? [`Icon=${icon}`] : []),
       'Terminal=false',
       'Categories=Network;',
       `StartupWMClass=${id}`,
@@ -87,42 +90,7 @@ function installDesktop(id, appImageSource) {
     ].join('\n'),
   );
   refreshMenus();
-  return p;
+  return [appImage, ...(hasIcon ? [icon] : []), file];
 }
 
-function uninstallDesktop(id) {
-  const { config } = resolveApp(id);
-  const p = paths(id, config.name);
-  assertOwned(p.desktop);
-  const removed = Object.values(p).filter((f) => fs.existsSync(f));
-  removed.forEach((f) => fs.rmSync(f));
-  refreshMenus();
-  return removed;
-}
-
-function findAppImage(id) {
-  const out = path.join(__dirname, '..', 'dist', id);
-  // After a rename, older builds with the previous name may still be there: take the newest.
-  const files = fs.existsSync(out) ? fs.readdirSync(out).filter((f) => f.endsWith('.AppImage')).map((f) => path.join(out, f)) : [];
-  if (!files.length) throw new Error(`No AppImage in dist/${id}; run the bundle first`);
-  return files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
-}
-
-if (require.main === module) {
-  // Usage: npm run desktop -- <app-id> [--uninstall]
-  const [id, flag] = process.argv.slice(2);
-  try {
-    if (flag === '--uninstall') {
-      const removed = uninstallDesktop(id);
-      console.log(removed.length ? `Removed:\n${removed.join('\n')}` : 'Nothing installed');
-    } else {
-      const p = installDesktop(id, findAppImage(id));
-      console.log(`Installed:\n${Object.values(p).join('\n')}`);
-    }
-  } catch (err) {
-    console.error(err.message);
-    process.exit(1);
-  }
-}
-
-module.exports = { installDesktop, uninstallDesktop };
+module.exports = { installDesktop, uninstallDesktop, isInstalled: (id) => !!readEntry(id) };

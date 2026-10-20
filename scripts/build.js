@@ -1,29 +1,42 @@
 const fs = require('fs');
 const path = require('path');
 const builder = require('electron-builder');
-const { resolveApp } = require('./common');
+// electron-builder's own logger; resolved from it so we hook the instance it uses.
+const { log: builderLog } = require(require.resolve('builder-util', { paths: [path.dirname(require.resolve('electron-builder'))] }));
+const { distDir, resolveApp } = require('./common');
 
-// flags: any of '--mac', '--win', '--linux'; none means the current OS.
-function buildApp(id, flags = []) {
+// Packages the app for the current OS into dist/<id>/ and returns the produced files.
+// electron-builder's detailed log is only shown if the build fails.
+async function buildApp(id) {
+  const output = [];
+  const stream = builderLog.stream;
+  builderLog.stream = { write: (text) => output.push(text) };
+  try {
+    return await runBuilder(id);
+  } catch (err) {
+    stream.write(output.join(''));
+    throw err;
+  } finally {
+    builderLog.stream = stream;
+  }
+}
+
+function runBuilder(id) {
+  // Start from an empty folder so builds left over from an older name can't be picked up.
+  fs.rmSync(path.join(distDir, id), { recursive: true, force: true });
   const { dir, configPath, config } = resolveApp(id);
 
   const icon = ['icon.png', 'icon.icns', 'icon.ico']
     .map((f) => path.join(dir, f))
     .find((f) => fs.existsSync(f));
 
-  const targets = {};
-  if (flags.includes('--mac')) targets.mac = [];
-  if (flags.includes('--win')) targets.win = [];
-  if (flags.includes('--linux')) targets.linux = [];
-
   return builder.build({
-    ...targets,
     publish: 'never',
     config: {
       appId: config.appId || `com.webapp.${id}`,
       productName: config.name,
       publish: [],
-      directories: { output: path.join('dist', id) },
+      directories: { output: path.join(distDir, id) },
       files: ['src/**/*', 'package.json'],
       extraResources: [
         { from: configPath, to: 'app-config.json' },
@@ -33,24 +46,9 @@ function buildApp(id, flags = []) {
       ...(icon && { icon }),
       mac: { target: ['dmg', 'zip'], category: 'public.app-category.productivity' },
       win: { target: ['nsis', 'portable'] },
-      linux: { target: ['AppImage', 'deb'], category: 'Network', syncDesktopName: true },
+      linux: { target: ['AppImage'], category: 'Network', syncDesktopName: true },
     },
   });
 }
 
-function report(promise) {
-  promise
-    .then((out) => console.log('Built:\n' + out.join('\n')))
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-}
-
-if (require.main === module) {
-  // Usage: npm run build -- <app-id> [--mac] [--win] [--linux]
-  const [id, ...flags] = process.argv.slice(2);
-  report(buildApp(id, flags));
-}
-
-module.exports = { buildApp, report };
+module.exports = { buildApp };

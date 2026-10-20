@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-// In dev the config path comes from scripts/run.js; packaged apps ship it as a resource.
+// Packaged apps ship their config as a resource; WEBAPP_CONFIG lets you run src/ directly.
 const configPath = process.env.WEBAPP_CONFIG || path.join(process.resourcesPath, 'app-config.json');
 const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 // The icon sits next to the config, both in apps/<id>/ and in the packaged resources.
