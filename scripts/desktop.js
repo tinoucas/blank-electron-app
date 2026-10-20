@@ -41,10 +41,22 @@ function refreshMenus() {
   }
 }
 
+// After a rename the AppImage gets a new file name; delete the copy the old .desktop pointed to.
+function removeStaleAppImage(p) {
+  if (!fs.existsSync(p.desktop)) return;
+  const exec = fs.readFileSync(p.desktop, 'utf8').match(/^Exec="(.*)"$/m);
+  if (!exec) return;
+  const old = exec[1].replace(/\\(["`$\\])/g, '$1');
+  if (old !== p.appImage && path.dirname(old) === path.dirname(p.appImage) && old.endsWith('.AppImage')) {
+    fs.rmSync(old, { force: true });
+  }
+}
+
 function installDesktop(id, appImageSource) {
   const { dir, config } = resolveApp(id);
   const p = paths(id, config.name);
   assertOwned(p.desktop);
+  removeStaleAppImage(p);
 
   fs.mkdirSync(path.dirname(p.appImage), { recursive: true });
   fs.copyFileSync(appImageSource, p.appImage);
@@ -90,9 +102,10 @@ function uninstallDesktop(id) {
 
 function findAppImage(id) {
   const out = path.join(__dirname, '..', 'dist', id);
-  const file = fs.existsSync(out) && fs.readdirSync(out).find((f) => f.endsWith('.AppImage'));
-  if (!file) throw new Error(`No AppImage in dist/${id}; run the bundle first`);
-  return path.join(out, file);
+  // After a rename, older builds with the previous name may still be there: take the newest.
+  const files = fs.existsSync(out) ? fs.readdirSync(out).filter((f) => f.endsWith('.AppImage')).map((f) => path.join(out, f)) : [];
+  if (!files.length) throw new Error(`No AppImage in dist/${id}; run the bundle first`);
+  return files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
 }
 
 if (require.main === module) {

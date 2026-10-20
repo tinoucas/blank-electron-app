@@ -14,7 +14,7 @@ npm install
 ```sh
 ./bundle.sh https://app.example.com                      # macOS / Linux
 bundle.cmd https://app.example.com                       # Windows
-./bundle.sh 192.168.1.10:8095 --icon ~/Pictures/app.png  # custom icon (file or URL)
+./bundle.sh 192.168.1.10:8095 --name "Music Assistant" --icon ~/Pictures/app.png
 ./bundle.sh --help
 ```
 
@@ -26,8 +26,13 @@ The steps it runs:
 4. Sets the icon: your `--icon` if given, otherwise the site's own icon if the app has none yet.
 5. Packages the app for the current OS into `dist/<id>/`.
 
-The id and name come from the domain: `app.example.com` gives id `app` and name `App`.
-To change the name, edit `app.json` and run the script again.
+Without `--name`, the id and name come from the domain: `app.example.com` gives id `app`
+and name `App`. With `--name "Music Assistant"`, a new app gets the id `music-assistant`.
+
+To rename an existing app, run the script again with the same URL and a new `--name`.
+Only the display name changes. The id stays the same, so the installed `.desktop` entry
+is updated in place, and the old profile folder is kept so you stay logged in. Names
+can't contain `< > : " / \ | ? *`, because they are used in file names.
 
 ### URL checks
 
@@ -104,6 +109,7 @@ and AppImage/deb (Linux).
 | Key            | Meaning |
 |----------------|---------|
 | `name`         | Window title and product name. It also names the separate profile folder, so cookies and logins are kept apart for each app |
+| `profile`      | Name of the profile folder, if it differs from `name`. Set automatically on rename so logins are kept |
 | `url`          | Start page |
 | `appId`        | Unique bundle id, for example `com.yourco.myapp` |
 | `width`/`height` | Initial window size. After the first run, the last size and position are remembered |

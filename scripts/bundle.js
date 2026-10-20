@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync, spawn } = require('child_process');
 const { parseUrl, resolveUrl } = require('./url');
+const { validateName } = require('./common');
 
 const USAGE = `Usage: bundle <url> [options]
 
@@ -14,6 +15,10 @@ Arguments:
                      The page must load, otherwise nothing is created.
 
 Options:
+  --name <name>      Display name of the app (window title, app menu, file names).
+                     For a new app the id is derived from it ("Music Assistant" ->
+                     music-assistant); for an existing app only the display name changes.
+                     Default: taken from the domain.
   --icon <file|url>  Use this image as the app icon instead of the site's own icon
                      (PNG, JPEG, WebP, GIF, SVG or ICO; 512x512 or larger looks best).
                      Replaces the app's current icon.
@@ -26,19 +31,23 @@ asked whether to install it in your app menu.
 
 Examples:
   bundle music.example.com
-  bundle http://192.168.1.10:8095 --icon ~/Pictures/music.png
+  bundle http://192.168.1.10:8095 --name "Music Assistant" --icon ~/Pictures/music.png
   bundle https://app.example.com --icon https://example.com/logo.svg`;
 
 function parseArgs(argv) {
-  const opts = { icon: undefined, skipCheck: false, help: false, url: undefined };
+  const opts = { icon: undefined, name: undefined, skipCheck: false, help: false, url: undefined };
+  const value = (a, i, what) => {
+    const v = a.includes('=') ? a.slice(a.indexOf('=') + 1) : argv[i];
+    if (!v) throw new Error(`${a.split('=')[0]} needs ${what}`);
+    return v;
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '-h' || a === '--help') opts.help = true;
     else if (a === '--skip-check') opts.skipCheck = true;
-    else if (a === '--icon' || a.startsWith('--icon=')) {
-      opts.icon = a.includes('=') ? a.slice(a.indexOf('=') + 1) : argv[++i];
-      if (!opts.icon) throw new Error('--icon needs a file or URL');
-    } else if (a.startsWith('-')) throw new Error(`Unknown option: ${a}`);
+    else if (a === '--icon' || a.startsWith('--icon=')) opts.icon = value(a, a.includes('=') ? i : ++i, 'a file or URL');
+    else if (a === '--name' || a.startsWith('--name=')) opts.name = validateName(value(a, a.includes('=') ? i : ++i, 'a name'));
+    else if (a.startsWith('-')) throw new Error(`Unknown option: ${a}`);
     else if (opts.url) throw new Error(`Only one URL is allowed (got "${opts.url}" and "${a}")`);
     else opts.url = a;
   }
@@ -67,7 +76,7 @@ if (!fs.existsSync(path.join(root, 'node_modules'))) {
 }
 
 const readline = require('readline/promises');
-const { appsDir, findAppByUrl, createApp, redirectHosts } = require('./common');
+const { appsDir, findAppByUrl, createApp, renameApp, redirectHosts } = require('./common');
 const { ensureIcon, loadIcon } = require('./icon');
 const { buildApp } = require('./build');
 const { installDesktop } = require('./desktop');
@@ -101,10 +110,11 @@ async function main() {
   let id = findAppByUrl(url);
   if (id) {
     console.log(`Using existing apps/${id}/app.json`);
+    if (opts.name && renameApp(id, opts.name)) console.log(`Renamed to "${opts.name}" (id stays "${id}")`);
   } else {
     const extraHosts = redirectHosts(url, finalUrl);
     try {
-      id = createApp(url, { extraHosts });
+      id = createApp(url, { name: opts.name, extraHosts });
     } catch (err) {
       throw new Error(`${err.message} (it points to a different URL; use "npm run new -- ${url} --id <id>")`);
     }

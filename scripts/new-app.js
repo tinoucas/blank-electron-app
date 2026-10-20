@@ -1,5 +1,5 @@
 const path = require('path');
-const { appsDir, createApp, redirectHosts } = require('./common');
+const { appsDir, validateName, createApp, redirectHosts } = require('./common');
 const { resolveUrl } = require('./url');
 const { ensureIcon, loadIcon } = require('./icon');
 
@@ -25,10 +25,11 @@ if (args.length !== 1 || args[0].startsWith('-')) {
 }
 
 (async () => {
+  if (name !== undefined) validateName(name);
   const { url, finalUrl, warnings } = await resolveUrl(args[0], { skipCheck });
   warnings.forEach((w) => console.warn(`Warning: ${w}`));
   const customIcon = icon && (await loadIcon(icon));
-  const created = createApp(url, { id, name, extraHosts: redirectHosts(url, finalUrl) });
+  const created = createApp(url, { id, name: name?.trim(), extraHosts: redirectHosts(url, finalUrl) });
   console.log(`Created apps/${created}/app.json`);
   const dir = path.join(appsDir, created);
   if (customIcon) await customIcon(dir);

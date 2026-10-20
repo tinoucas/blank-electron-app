@@ -10,7 +10,8 @@ const iconPath = path.join(path.dirname(configPath), 'icon.png');
 
 // Give every wrapped site its own profile (cookies, storage) even in dev.
 app.setName(config.name);
-app.setPath('userData', path.join(app.getPath('appData'), config.name));
+// "profile" keeps the original folder (and logins) when an app is renamed.
+app.setPath('userData', path.join(app.getPath('appData'), config.profile || config.name));
 
 const startHost = new URL(config.url).hostname;
 const allowedHosts = [startHost, ...(config.allowedHosts || [])];

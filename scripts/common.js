@@ -42,7 +42,27 @@ function findAppByUrl(url) {
   });
 }
 
-function createApp(url, { id = idFromUrl(url), name, extraHosts = [] } = {}) {
+// Display names end up in file and folder names (AppImage, profile folder), so keep them portable.
+function validateName(name) {
+  const n = String(name ?? '').trim();
+  if (!n) throw new Error('The name is empty');
+  if (n.length > 64) throw new Error('The name is too long (64 characters max)');
+  if (/[<>:"/\\|?*\x00-\x1f]/.test(n)) throw new Error(`The name can't contain any of < > : " / \\ | ? * (got "${n}")`);
+  if (/^\.+$/.test(n)) throw new Error(`Not a usable name: "${n}"`);
+  return n;
+}
+
+// "Music Assistant" -> "music-assistant"
+function slugify(name) {
+  return name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function createApp(url, { name, id = (name && slugify(name)) || idFromUrl(url), extraHosts = [] } = {}) {
   const dir = path.join(appsDir, id);
   if (fs.existsSync(dir)) throw new Error(`apps/${id} already exists; pick another id`);
   fs.mkdirSync(dir, { recursive: true });
@@ -59,6 +79,16 @@ function createApp(url, { id = idFromUrl(url), name, extraHosts = [] } = {}) {
   return id;
 }
 
+// Changes an app's display name, keeping its profile folder so logins survive.
+function renameApp(id, name) {
+  const { configPath, config } = resolveApp(id);
+  if (config.name === name) return false;
+  const updated = { name, profile: config.profile || config.name, ...config };
+  updated.name = name;
+  fs.writeFileSync(configPath, JSON.stringify(updated, null, 2) + '\n');
+  return true;
+}
+
 // Extra hosts to allow when the start URL redirects to a domain the app wouldn't otherwise keep in-app.
 function redirectHosts(url, finalUrl) {
   const start = baseHost(url);
@@ -66,4 +96,15 @@ function redirectHosts(url, finalUrl) {
   return final === start || final.endsWith('.' + start) ? [] : [final];
 }
 
-module.exports = { appsDir, listApps, resolveApp, normalizeUrl, idFromUrl, findAppByUrl, createApp, redirectHosts };
+module.exports = {
+  appsDir,
+  listApps,
+  resolveApp,
+  normalizeUrl,
+  idFromUrl,
+  findAppByUrl,
+  validateName,
+  createApp,
+  renameApp,
+  redirectHosts,
+};
