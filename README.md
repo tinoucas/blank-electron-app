@@ -23,6 +23,27 @@ into `dist/<id>/`. The id and name come from the
 domain, for example `app.example.com` gives id `app` and name `App`. To change the name or
 add an icon, edit the app folder and run the script again.
 
+### Linux: try it, then install it
+
+When you run `./bundle.sh` from a terminal on Linux, it launches the new AppImage and asks
+whether everything looks right. If you answer `y`, it installs the app:
+
+- `~/Applications/<Name>.AppImage`
+- `~/.local/share/icons/hicolor/512x512/apps/<id>.png`
+- `~/.local/share/applications/<id>.desktop`
+
+After that the app appears in your app menu. On Wayland, this is also what puts the
+right icon in the title bar: KDE and GNOME find a window's icon through the `.desktop`
+file named after its app id, and Electron uses `<id>` as that id.
+
+```sh
+npm run desktop -- <id>              # install the AppImage already in dist/<id>/
+npm run desktop -- <id> --uninstall  # remove all three files
+```
+
+Re-running the install replaces the copy in `~/Applications`. A `.desktop` file that this
+tool did not create is never overwritten.
+
 ## Create an app (or clone one for another URL)
 
 ```sh
