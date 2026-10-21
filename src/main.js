@@ -2,6 +2,7 @@ const { app, BrowserWindow, Menu, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { setupDevices } = require('./devices');
+const { setupContextMenu } = require('./context-menu');
 
 // Packaged apps ship their config as a resource; WEBAPP_CONFIG lets you run src/ directly.
 const configPath = process.env.WEBAPP_CONFIG || path.join(process.resourcesPath, 'app-config.json');
@@ -81,6 +82,7 @@ function createWindow() {
   });
 
   setupDevices(win.webContents.session, { isAllowed, userData: app.getPath('userData'), getWindow: () => win });
+  setupContextMenu(win);
   win.loadURL(config.url);
 }
 

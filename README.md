@@ -47,6 +47,8 @@ to change the icon or the name; you stay logged in.
 - Links to the site and its subdomains open inside the app; any other link opens in your
   browser. If the site signs you in through another domain (Google, Microsoft…), add that
   domain to `allowedHosts` in `apps/<id>/app.json` and run the command again.
+- Right-click anywhere for Back, Forward, Refresh and Copy URL. Links, text fields and
+  selected text get the usual copy/paste items too.
 - Each app has its own cookies and logins, separate from your browser and from other apps.
 - Sites that talk to USB, HID or serial devices (WebUSB, WebHID, Web Serial) work: when the
   site asks for a device, the app shows a list to choose from and remembers your choice.
