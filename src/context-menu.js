@@ -1,51 +1,125 @@
-const { Menu, clipboard, shell } = require('electron');
+const { WebContentsView, clipboard, shell } = require('electron');
+const path = require('path');
 
-// Right-click menu. Electron has none by default, so this also brings back the usual
-// text, link and spelling actions. Navigation comes first, as requested; the symbols are
-// part of the labels because image icons in native menus don't show on every desktop.
-function contextMenuTemplate(wc, params) {
+// Right-click menu, drawn by the app (src/menu/) rather than as a native menu so that Back and
+// Forward can sit side by side as icons. It is an overlay inside the window, not a separate
+// popup window, because Wayland doesn't let apps position their own windows.
+
+// Space the menu page leaves around the menu for its shadow (body padding in menu.html).
+const PAD = { left: 8, top: 8 };
+
+// What the menu shows for this right-click, and what each item does.
+function menuModel(wc, params) {
   const history = wc.navigationHistory;
-  const template = [
-    { label: '←  Back', enabled: history.canGoBack(), click: () => history.goBack() },
-    { label: '→  Forward', enabled: history.canGoForward(), click: () => history.goForward() },
-    { label: '↻  Refresh', click: () => wc.reload() },
-    { type: 'separator' },
-    { label: 'Copy URL', click: () => clipboard.writeText(wc.getURL()) },
+  const actions = {};
+  const item = (id, props, action) => {
+    actions[id] = action;
+    return { id, ...props };
+  };
+  const nav = [
+    item('back', { icon: 'back', title: 'Back', enabled: history.canGoBack() }, () => history.goBack()),
+    item('forward', { icon: 'forward', title: 'Forward', enabled: history.canGoForward() }, () => history.goForward()),
   ];
-  const section = (items) => items.length && template.push({ type: 'separator' }, ...items);
+  const items = [
+    item('refresh', { icon: 'refresh', label: 'Refresh' }, () => wc.reload()),
+    { separator: true },
+    item('copy-url', { label: 'Copy URL' }, () => clipboard.writeText(wc.getURL())),
+  ];
+  const section = (entries) => entries.length && items.push({ separator: true }, ...entries);
 
   if (params.misspelledWord) {
     const suggestions = params.dictionarySuggestions.slice(0, 5);
     section(
       suggestions.length
-        ? suggestions.map((s) => ({ label: s, click: () => wc.replaceMisspelling(s) }))
+        ? suggestions.map((s, i) => item(`spell-${i}`, { label: s }, () => wc.replaceMisspelling(s)))
         : [{ label: 'No spelling suggestions', enabled: false }],
     );
   }
   if (params.isEditable) {
     const f = params.editFlags;
     section([
-      { role: 'cut', enabled: f.canCut },
-      { role: 'copy', enabled: f.canCopy },
-      { role: 'paste', enabled: f.canPaste },
-      { role: 'selectAll', enabled: f.canSelectAll },
+      item('cut', { label: 'Cut', enabled: f.canCut }, () => wc.cut()),
+      item('copy', { label: 'Copy', enabled: f.canCopy }, () => wc.copy()),
+      item('paste', { label: 'Paste', enabled: f.canPaste }, () => wc.paste()),
+      item('select-all', { label: 'Select All', enabled: f.canSelectAll }, () => wc.selectAll()),
     ]);
   } else if (params.selectionText.trim()) {
-    section([{ role: 'copy' }]);
+    section([item('copy', { label: 'Copy' }, () => wc.copy())]);
   }
   if (params.linkURL) {
     section([
-      { label: 'Copy link address', click: () => clipboard.writeText(params.linkURL) },
-      { label: 'Open link in browser', click: () => shell.openExternal(params.linkURL) },
+      item('copy-link', { label: 'Copy link address' }, () => clipboard.writeText(params.linkURL)),
+      item('open-link', { label: 'Open link in browser' }, () => shell.openExternal(params.linkURL)),
     ]);
   }
-  return template;
+  return { nav, items, actions };
 }
 
 function setupContextMenu(win) {
-  win.webContents.on('context-menu', (_event, params) => {
-    Menu.buildFromTemplate(contextMenuTemplate(win.webContents, params)).popup({ window: win });
+  const wc = win.webContents;
+  let view = null;
+  let shown = false;
+  let actions = {};
+  let at = { x: 0, y: 0 };
+
+  const hide = () => {
+    if (!shown) return;
+    shown = false;
+    win.contentView.removeChildView(view);
+  };
+  // Give focus back to the page so Copy/Paste act on what was selected there.
+  const closeAndRefocus = () => {
+    hide();
+    wc.focus();
+  };
+
+  function createView() {
+    view = new WebContentsView({
+      webPreferences: { preload: path.join(__dirname, 'menu', 'preload.js'), sandbox: true, contextIsolation: true },
+    });
+    view.setBackgroundColor('#00000000');
+    view.webContents.loadFile(path.join(__dirname, 'menu', 'menu.html'));
+    view.webContents.ipc.on('ready', (_e, width, height) => {
+      // Keep the menu inside the window: shift it left, or open it upwards, when it would overflow.
+      const { width: winW, height: winH } = win.getContentBounds();
+      let x = at.x - PAD.left;
+      let y = at.y - PAD.top;
+      if (x + width > winW) x = winW - width;
+      if (y + height > winH) y = at.y - height + PAD.top;
+      x = Math.max(0, Math.min(x, winW - width));
+      y = Math.max(0, Math.min(y, winH - height));
+      view.setBounds({ x, y, width, height });
+      view.webContents.focus();
+    });
+    view.webContents.ipc.on('choose', (_e, id) => {
+      const action = actions[id];
+      closeAndRefocus();
+      action?.();
+    });
+    view.webContents.ipc.on('close', closeAndRefocus);
+    // Clicking anywhere else takes focus away from the menu, which closes it.
+    view.webContents.on('blur', hide);
+  }
+
+  wc.on('context-menu', (_event, params) => {
+    if (!view) createView();
+    const model = menuModel(wc, params);
+    actions = model.actions;
+    at = { x: params.x, y: params.y };
+    // Rendered off-screen first; 'ready' reports its size and moves it into place.
+    view.setBounds({ x: -2000, y: -2000, width: 600, height: 800 });
+    if (!shown) win.contentView.addChildView(view);
+    shown = true;
+    const send = () => view.webContents.send('show', { nav: model.nav, items: model.items });
+    if (view.webContents.isLoading()) view.webContents.once('did-finish-load', send);
+    else send();
   });
+  // A click in the page closes the menu even when focus didn't move to the page first.
+  wc.on('before-mouse-event', (_event, mouse) => {
+    if (mouse.type === 'mouseDown' && mouse.button !== 'right') hide();
+  });
+  for (const event of ['blur', 'resize', 'move']) win.on(event, hide);
+  wc.on('did-start-navigation', hide);
 }
 
-module.exports = { setupContextMenu, contextMenuTemplate };
+module.exports = { setupContextMenu, menuModel };
