@@ -11,10 +11,10 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 const iconPath = path.join(path.dirname(configPath), 'icon.png');
 
 // Chromium's media integration: MPRIS on Linux, Now Playing on macOS, the media overlay on
-// Windows, plus media keys. Electron turns it on by default; here it's off unless the app was
-// created with --enable-mpris-controls (enabled explicitly too, in case that default changes).
+// Windows, plus media keys. On unless the app was created with --disable-mpris-controls
+// (enabled explicitly, in case Electron's own default changes).
 const MEDIA_FEATURES = 'HardwareMediaKeyHandling,MediaSessionService';
-app.commandLine.appendSwitch(config.mediaControls ? 'enable-features' : 'disable-features', MEDIA_FEATURES);
+app.commandLine.appendSwitch(config.mediaControls !== false ? 'enable-features' : 'disable-features', MEDIA_FEATURES);
 
 // Give every wrapped site its own profile (cookies, storage) even in dev.
 app.setName(config.name);

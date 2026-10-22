@@ -34,7 +34,7 @@ Add `--icon` or `--name` to change the icon or the name; you stay logged in.
 | `--icon <file or URL>` | Your own icon (PNG, JPEG, WebP, GIF, SVG or ICO). Default: the site's icon |
 | `--id my-app` | Internal name used for files. Default: from `--name`. Rarely needed |
 | `--no-context-menu` | Turn off the right-click menu (`--context-menu` turns it back on) |
-| `--enable-mpris-controls` | Let your system's media controls (KDE media widget, macOS Now Playing, Windows media overlay, media keys) play/pause the site's audio and video (`--disable-mpris-controls` turns them off) |
+| `--disable-mpris-controls` | Turn off your system's media controls (KDE media widget, macOS Now Playing, Windows media overlay, media keys) for the site's audio and video. On by default (`--enable-mpris-controls` turns them back on) |
 | `--skip-check` | Build even if the page can't be loaded right now |
 | `--uninstall` | Remove the installed app |
 | `--help` | Show all of this |

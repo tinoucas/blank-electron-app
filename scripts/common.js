@@ -93,14 +93,14 @@ function createApp(url, { name, id = (name && slugify(name)) || idFromUrl(url), 
     height: 800,
     allowedHosts: [...new Set([baseHost(url), ...extraHosts])],
     userAgent: null,
-    ...SETTING_DEFAULTS,
+    // Only options passed explicitly are stored; anything else follows SETTING_DEFAULTS.
     ...settings,
   });
   return id;
 }
 
 // On/off features, set with create-app options (see create-app.js) and read by src/main.js.
-const SETTING_DEFAULTS = { contextMenu: true, mediaControls: false };
+const SETTING_DEFAULTS = { contextMenu: true, mediaControls: true };
 const SETTING_LABELS = { contextMenu: 'Right-click menu', mediaControls: 'Media controls' };
 
 // Applies changed settings to an existing app; returns a line per change.

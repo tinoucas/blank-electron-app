@@ -25,11 +25,11 @@ Options:
                      512x512 or larger looks best). Default: the site's own icon.
   --no-context-menu  Turn off the right-click menu (Back, Forward, Refresh, Copy URL).
                      --context-menu turns it back on.
-  --enable-mpris-controls
-                     Let the system's media controls drive what the site plays: MPRIS on
-                     Linux (e.g. the KDE media widget), Now Playing on macOS, the media
-                     overlay on Windows, and the keyboard's media keys.
-                     --disable-mpris-controls turns them off again.
+  --disable-mpris-controls
+                     Turn off the system's media controls for what the site plays (on by
+                     default): MPRIS on Linux (e.g. the KDE media widget), Now Playing on
+                     macOS, the media overlay on Windows, and the keyboard's media keys.
+                     --enable-mpris-controls turns them back on.
   --skip-check       Don't check that the URL loads (e.g. the server is offline right
                      now, or uses a certificate only your system trusts).
   --uninstall        Remove the installed app.
