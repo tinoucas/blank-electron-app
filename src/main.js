@@ -10,6 +10,12 @@ const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 // The icon sits next to the config, both in apps/<id>/ and in the packaged resources.
 const iconPath = path.join(path.dirname(configPath), 'icon.png');
 
+// Chromium's media integration: MPRIS on Linux, Now Playing on macOS, the media overlay on
+// Windows, plus media keys. Electron turns it on by default; here it's off unless the app was
+// created with --enable-mpris-controls (enabled explicitly too, in case that default changes).
+const MEDIA_FEATURES = 'HardwareMediaKeyHandling,MediaSessionService';
+app.commandLine.appendSwitch(config.mediaControls ? 'enable-features' : 'disable-features', MEDIA_FEATURES);
+
 // Give every wrapped site its own profile (cookies, storage) even in dev.
 app.setName(config.name);
 // Must match the Start menu shortcut's id so Windows groups the window with it (taskbar icon, pinning).
@@ -82,7 +88,7 @@ function createWindow() {
   });
 
   setupDevices(win.webContents.session, { isAllowed, userData: app.getPath('userData'), getWindow: () => win });
-  setupContextMenu(win);
+  if (config.contextMenu !== false) setupContextMenu(win);
   win.loadURL(config.url);
 }
 

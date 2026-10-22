@@ -23,8 +23,8 @@ installed is [Node.js](https://nodejs.org) 20 or newer.
    - **Windows:** it's copied to `%LOCALAPPDATA%\Programs` and added to the Start menu,
      from where you can pin it to the taskbar.
 
-Running the same command again updates the app. For example, add `--icon` or `--name`
-to change the icon or the name; you stay logged in.
+Running the same command again updates the app and keeps the options you set before.
+Add `--icon` or `--name` to change the icon or the name; you stay logged in.
 
 ## Options
 
@@ -33,6 +33,8 @@ to change the icon or the name; you stay logged in.
 | `--name "My App"` | Name shown in the title bar and the app menu. Default: from the domain |
 | `--icon <file or URL>` | Your own icon (PNG, JPEG, WebP, GIF, SVG or ICO). Default: the site's icon |
 | `--id my-app` | Internal name used for files. Default: from `--name`. Rarely needed |
+| `--no-context-menu` | Turn off the right-click menu (`--context-menu` turns it back on) |
+| `--enable-mpris-controls` | Let your system's media controls (KDE media widget, macOS Now Playing, Windows media overlay, media keys) play/pause the site's audio and video (`--disable-mpris-controls` turns them off) |
 | `--skip-check` | Build even if the page can't be loaded right now |
 | `--uninstall` | Remove the installed app |
 | `--help` | Show all of this |

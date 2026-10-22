@@ -82,7 +82,7 @@ function assertIdFree(id) {
   }
 }
 
-function createApp(url, { name, id = (name && slugify(name)) || idFromUrl(url), extraHosts = [] } = {}) {
+function createApp(url, { name, id = (name && slugify(name)) || idFromUrl(url), extraHosts = [], settings = {} } = {}) {
   assertIdFree(id);
   fs.mkdirSync(path.join(appsDir, id), { recursive: true });
   saveConfig(id, {
@@ -93,8 +93,24 @@ function createApp(url, { name, id = (name && slugify(name)) || idFromUrl(url), 
     height: 800,
     allowedHosts: [...new Set([baseHost(url), ...extraHosts])],
     userAgent: null,
+    ...SETTING_DEFAULTS,
+    ...settings,
   });
   return id;
+}
+
+// On/off features, set with create-app options (see create-app.js) and read by src/main.js.
+const SETTING_DEFAULTS = { contextMenu: true, mediaControls: false };
+const SETTING_LABELS = { contextMenu: 'Right-click menu', mediaControls: 'Media controls' };
+
+// Applies changed settings to an existing app; returns a line per change.
+function updateSettings(id, settings) {
+  const { config } = resolveApp(id);
+  const changes = Object.entries(settings)
+    .filter(([key, value]) => (config[key] ?? SETTING_DEFAULTS[key]) !== value)
+    .map(([key, value]) => `${SETTING_LABELS[key]}: ${value ? 'on' : 'off'}`);
+  if (changes.length) saveConfig(id, { ...config, ...settings });
+  return changes;
 }
 
 // Changes an app's display name, keeping its profile folder so logins survive.
@@ -130,6 +146,7 @@ module.exports = {
   validateId,
   createApp,
   renameApp,
+  updateSettings,
   changeId,
   redirectHosts,
 };

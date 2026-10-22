@@ -23,10 +23,19 @@ Options:
                      Default: derived from the name. Rarely needed.
   --icon <file|url>  Image to use as the app icon (PNG, JPEG, WebP, GIF, SVG or ICO;
                      512x512 or larger looks best). Default: the site's own icon.
+  --no-context-menu  Turn off the right-click menu (Back, Forward, Refresh, Copy URL).
+                     --context-menu turns it back on.
+  --enable-mpris-controls
+                     Let the system's media controls drive what the site plays: MPRIS on
+                     Linux (e.g. the KDE media widget), Now Playing on macOS, the media
+                     overlay on Windows, and the keyboard's media keys.
+                     --disable-mpris-controls turns them off again.
   --skip-check       Don't check that the URL loads (e.g. the server is offline right
                      now, or uses a certificate only your system trusts).
   --uninstall        Remove the installed app.
   -h, --help         Show this help.
+
+Settings given with these options are kept when you run the command again.
 
 Once built, the app is launched so you can check it, and you are asked whether to
 install it (Linux: app menu, macOS: ~/Applications, Windows: Start menu).
@@ -37,15 +46,26 @@ Examples:
   ${self} 192.168.1.10:8095 --uninstall`;
 
 function parseArgs(argv) {
-  const opts = { url: undefined, name: undefined, id: undefined, icon: undefined, skipCheck: false, uninstall: false, help: false };
+  const opts = { url: undefined, name: undefined, id: undefined, icon: undefined, settings: {}, skipCheck: false, uninstall: false, help: false };
   const withValue = { '--name': 'name', '--id': 'id', '--icon': 'icon' };
+  // On/off switches stored in app.json, so they stick when the app is rebuilt.
+  const switches = {
+    '--context-menu': ['contextMenu', true],
+    '--no-context-menu': ['contextMenu', false],
+    '--enable-mpris-controls': ['mediaControls', true],
+    '--disable-mpris-controls': ['mediaControls', false],
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const [flag, inline] = a.startsWith('--') && a.includes('=') ? [a.slice(0, a.indexOf('=')), a.slice(a.indexOf('=') + 1)] : [a, undefined];
     if (flag === '-h' || flag === '--help') opts.help = true;
     else if (flag === '--skip-check') opts.skipCheck = true;
     else if (flag === '--uninstall') opts.uninstall = true;
-    else if (withValue[flag]) {
+    else if (switches[a]) {
+      const [setting, value] = switches[a];
+      if (opts.settings[setting] === !value) throw new Error(`${a} contradicts an earlier option`);
+      opts.settings[setting] = value;
+    } else if (withValue[flag]) {
       const v = inline ?? argv[++i];
       if (!v) throw new Error(`${flag} needs a value`);
       opts[withValue[flag]] = v;
@@ -81,7 +101,7 @@ if (!fs.existsSync(path.join(root, 'node_modules'))) {
 }
 
 const readline = require('readline/promises');
-const { appsDir, distDir, resolveApp, findAppByUrl, createApp, renameApp, changeId, redirectHosts } = require('./common');
+const { appsDir, distDir, resolveApp, findAppByUrl, createApp, renameApp, updateSettings, changeId, redirectHosts } = require('./common');
 const { ensureIcon, loadIcon } = require('./icon');
 const { buildApp } = require('./build');
 // Where and how the built app gets installed on this OS; null where we only build.
@@ -164,9 +184,10 @@ async function create() {
       id = opts.id;
     }
     if (opts.name && renameApp(id, opts.name)) console.log(`Renamed to "${opts.name}"`);
+    for (const change of updateSettings(id, opts.settings)) console.log(change);
   } else {
     const extraHosts = redirectHosts(url, finalUrl);
-    id = createApp(url, { name: opts.name, id: opts.id, extraHosts });
+    id = createApp(url, { name: opts.name, id: opts.id, extraHosts, settings: opts.settings });
     console.log(`Creating "${resolveApp(id).config.name}" (apps/${id})${extraHosts.length ? `, also allowing ${extraHosts} where ${url} redirects` : ''}`);
   }
 
