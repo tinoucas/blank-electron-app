@@ -5,6 +5,33 @@ const path = require('path');
 // Forward can sit side by side as icons. It is an overlay inside the window, not a separate
 // popup window, because Wayland doesn't let apps position their own windows.
 
+// Turns looping on or off for the video at viewport point (x, y) of the main frame. When the video
+// is in an iframe, walks down the frames under the point, converting the point at each level.
+async function setVideoLoop(wc, frame, x, y, loop) {
+  const zoom = wc.getZoomFactor();
+  let point = { x: x / zoom, y: y / zoom };
+  const chain = [];
+  for (let f = frame || wc.mainFrame; f; f = f.parent) chain.unshift(f);
+  for (const parent of chain.slice(0, -1)) {
+    // Where the content box of the iframe under the point starts, in this frame's coordinates.
+    const offset = await parent.executeJavaScript(`(() => {
+      const el = document.elementsFromPoint(${point.x}, ${point.y}).find((e) => e.tagName === 'IFRAME' || e.tagName === 'FRAME');
+      if (!el) return null;
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      return { x: r.left + el.clientLeft + parseFloat(cs.paddingLeft), y: r.top + el.clientTop + parseFloat(cs.paddingTop) };
+    })()`);
+    if (!offset) break;
+    point = { x: point.x - offset.x, y: point.y - offset.y };
+  }
+  // The video under the point (overlays on top of it are skipped), else the frame's only video.
+  return chain.at(-1).executeJavaScript(`(() => {
+    const videos = document.querySelectorAll('video');
+    const v = document.elementsFromPoint(${point.x}, ${point.y}).find((e) => e.tagName === 'VIDEO') || (videos.length === 1 ? videos[0] : null);
+    if (v) v.loop = ${loop};
+    return !!v;
+  })()`);
+}
+
 // Space the menu page leaves around the menu for its shadow (body padding in menu.html).
 const PAD = { left: 8, top: 8 };
 
@@ -45,6 +72,14 @@ function menuModel(wc, params) {
     ]);
   } else if (params.selectionText.trim()) {
     section([item('copy', { label: 'Copy' }, () => wc.copy())]);
+  }
+  if (params.mediaType === 'video') {
+    const looping = params.mediaFlags.isLooping;
+    section([
+      item('loop', { label: 'Loop', checked: looping, enabled: params.mediaFlags.canLoop }, () =>
+        setVideoLoop(wc, params.frame, params.x, params.y, !looping),
+      ),
+    ]);
   }
   if (params.linkURL) {
     section([
@@ -94,7 +129,9 @@ function setupContextMenu(win) {
     view.webContents.ipc.on('choose', (_e, id) => {
       const action = actions[id];
       closeAndRefocus();
-      action?.();
+      Promise.resolve()
+        .then(() => action?.())
+        .catch((err) => console.error('Menu action failed:', err));
     });
     view.webContents.ipc.on('close', closeAndRefocus);
     // Clicking anywhere else takes focus away from the menu, which closes it.
@@ -122,4 +159,4 @@ function setupContextMenu(win) {
   wc.on('did-start-navigation', hide);
 }
 
-module.exports = { setupContextMenu, menuModel };
+module.exports = { setupContextMenu, menuModel, setVideoLoop };

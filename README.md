@@ -50,7 +50,8 @@ Add `--icon` or `--name` to change the icon or the name; you stay logged in.
   browser. If the site signs you in through another domain (Google, Microsoft…), add that
   domain to `allowedHosts` in `apps/<id>/app.json` and run the command again.
 - Right-click anywhere for Back, Forward, Refresh and Copy URL. Links, text fields and
-  selected text get the usual copy/paste items too.
+  selected text get the usual copy/paste items too, and videos get a Loop toggle (except
+  on sites with their own video menu, like YouTube).
 - Media controls (MPRIS etc.) appear while the site plays audio or video itself. Sites that
   remote-control other speakers need to opt in: in Music Assistant, set *Settings → User
   Interface → Browser media controls* to *Any actively selected player*, inside the app.

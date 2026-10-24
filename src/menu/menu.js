@@ -3,6 +3,7 @@ const ICONS = {
   back: '<path d="M10 3 5 8l5 5M5 8h9" />',
   forward: '<path d="m6 3 5 5-5 5M11 8H2" />',
   refresh: '<path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2v3.5H10" />',
+  check: '<path d="M3 8.5 6.5 12 13 4.5" />',
 };
 const icon = (name) =>
   `<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
@@ -11,12 +12,15 @@ const menu = document.getElementById('menu');
 
 function button(item) {
   const b = document.createElement('button');
-  b.setAttribute('role', 'menuitem');
+  b.setAttribute('role', item.checked === undefined ? 'menuitem' : 'menuitemcheckbox');
+  if (item.checked !== undefined) b.setAttribute('aria-checked', String(item.checked));
   b.disabled = item.enabled === false;
   if (item.label) {
     const span = document.createElement('span');
     span.textContent = item.label;
-    if (item.icon) b.innerHTML = icon(item.icon);
+    // A checkbox item shows a tick in the icon column while it's on.
+    const iconName = item.checked === undefined ? item.icon : item.checked && 'check';
+    if (iconName) b.innerHTML = icon(iconName);
     else b.classList.add('text-only');
     b.append(span);
   } else {
